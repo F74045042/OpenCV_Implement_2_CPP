@@ -229,6 +229,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             #draw and display the corners
             img[i] = cv2.drawChessboardCorners(img[i], (11, 8), corners2, ret)
+
+            #show image
+            cv2.namedWindow("Image", 0)
+            cv2.resizeWindow("Image", 800, 800)
             cv2.imshow('Image', img[i])
             cv2.waitKey(500)
 
@@ -363,17 +367,66 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print('Image: ',i+1,'.bmp')
             print(dist)
 
-    # not done yet
+    # done
     def on_btn4_1_click(self):
-        #Global Threshold
-        #load image
-        img = cv2.imread("images/QR.png", 0)
+        #load 1~15.bmp and sort
+        file = glob.glob('images/CameraCalibration/*.bmp')
+        file.sort()
+        img = [cv2.imread(i) for i in file]
 
-        ret, img_out = cv2.threshold(img, 80, 255, cv2.THRESH_BINARY)
+        #terminal criteria
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-        #show image
-        cv2.imshow("Original image", img)
-        cv2.imshow("Threshold image", img_out)
+        #Store obj point and image point
+        objPoint = []   #3d point in real world
+        imgPoint = []   #2d point in image plane
+
+        #prepare object point, (0,0,0) (1,0,0) ... (10,7,0)
+        objp = np.zeros((11*8, 3), np.float32)
+        objp[:,:2] = np.mgrid[0:11, 0:8].T.reshape(-1, 2)
+
+        for i in range(15):
+            #convert to gray
+            img_gray = cv2.cvtColor(img[i], cv2.COLOR_BGR2GRAY)
+
+            #find the chess board corner
+            ret, corners = cv2.findChessboardCorners(img_gray, (11, 8), None)
+
+            if ret == True:
+                #add object points
+                objPoint.append(objp)
+
+                #find accurate point
+                corners2 = cv2.cornerSubPix(img_gray, corners, (10,10), (-1, -1), criteria)
+
+                #add image points
+                imgPoint.append(corners2)
+
+                ret, intrinsic_mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objPoint, imgPoint, img_gray.shape[::-1],None,None)
+
+        for i in range(0,5):
+            src_pts = np.float32([[0,0,0],[0,2,0],[2,2,0],[2,0,0],[0,0,-2],[0,2,-2],[2,2,-2],[2,0,-2]])
+            pts,_ = cv2.projectPoints(src_pts, rvecs[i], tvecs[i], intrinsic_mtx, dist)
+            pts = np.int32(pts).reshape(-1,2)
+            cv2.line(img[i], (pts[0,0], pts[0,1]), (pts[1,0], pts[1,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[1,0], pts[1,1]), (pts[2,0], pts[2,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[2,0], pts[2,1]), (pts[3,0], pts[3,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[3,0], pts[3,1]), (pts[0,0], pts[0,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[4,0], pts[4,1]), (pts[5,0], pts[5,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[5,0], pts[5,1]), (pts[6,0], pts[6,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[6,0], pts[6,1]), (pts[7,0], pts[7,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[7,0], pts[7,1]), (pts[4,0], pts[4,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[0,0], pts[0,1]), (pts[4,0], pts[4,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[1,0], pts[1,1]), (pts[5,0], pts[5,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[2,0], pts[2,1]), (pts[6,0], pts[6,1]), (0,0,255), 10)
+            cv2.line(img[i], (pts[3,0], pts[3,1]), (pts[7,0], pts[7,1]), (0,0,255), 10)
+
+            #flip image
+            img_out = cv2.flip(img[i], -1)
+            cv2.namedWindow("AR", 0)
+            cv2.resizeWindow("AR", 400, 400)
+            cv2.imshow('AR', img_out)
+            cv2.waitKey(500)
 
         #destroy
         cv2.waitKey()
